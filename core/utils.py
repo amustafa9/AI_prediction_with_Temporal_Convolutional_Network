@@ -28,3 +28,4 @@ def marmousi_model():
     return AI
 
 
+marmousi_seismic()

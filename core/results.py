@@ -27,16 +27,16 @@ def evaluate(args):
     trace_plot(AI, AI_inv)
 
     # Print r2 and PCC scores
-    train_indices = np.linspace(0, 2720, args.n_wells).astype(int)
-    val_indices = np.setdiff1d(np.arange(0, 2720).astype(int), train_indices)
+    train_indices = np.linspace(0, 2715, args.n_wells).astype(int)
+    val_indices = np.setdiff1d(np.arange(0, 2715).astype(int), train_indices)
     r2_pcc_scores(train_indices, val_indices, AI, AI_inv)
 
 
 def plot(img, cmap='rainbow', cbar_label=r'AI ($m/s\times g/cm^3$)', vmin=None, vmax=None):
     """Makes seaborn style plots"""
     dt = 0.00466
-    dx = 6.25
-    Y, X = np.mgrid[slice(0.47, 2.8 + dt, dt), slice(0, 17000 + dx, dx)]
+    dx = 6.249907918968693
+    Y, X = np.mgrid[slice(0.47, 2.8 + dt, dt), slice(12.5, 16981 + dx, dx)]
 
     fig = plt.figure(figsize=(20, 6))
     ax = fig.add_subplot(1, 1, 1)
