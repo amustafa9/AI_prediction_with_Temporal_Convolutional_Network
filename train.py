@@ -12,6 +12,7 @@ from core.model import *
 from core.results import *
 
 # Fix the random seeds
+torch.manual_seed(2561716316833428258)
 torch.backends.cudnn.deterministic = True
 if torch.cuda.is_available(): torch.cuda.manual_seed_all(2019)
 np.random.seed(seed=2019)
@@ -165,3 +166,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     train(args)
     evaluate(args)
+
