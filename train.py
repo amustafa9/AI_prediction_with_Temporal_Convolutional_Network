@@ -12,7 +12,7 @@ from core.model import *
 from core.results import *
 
 # Fix the random seeds
-torch.manual_seed(2561716316833428258)
+#torch.manual_seed(2561716316833428258)
 torch.backends.cudnn.deterministic = True
 if torch.cuda.is_available(): torch.cuda.manual_seed_all(2019)
 np.random.seed(seed=2019)
@@ -32,13 +32,13 @@ def train_val_split(args):
 
 
     # Split into train and val
-    train_indices = np.linspace(0+2, 2720-2, args.n_wells).astype(int)
-    val_indices = np.setdiff1d(np.arange(0+2, 2720-2).astype(int), train_indices)
+    train_indices = np.linspace(452, 2399, args.n_wells).astype(int)
+    val_indices = np.setdiff1d(np.arange(452, 2399).astype(int), train_indices)
     x_train = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in train_indices]), axis=1).transpose(0, 1, 3, 2)
     y_train = impedance[train_indices].reshape(len(train_indices), 1, impedance.shape[1], 1)
     x_val = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in val_indices]), axis=1).transpose(0,1,3,2)
     y_val = impedance[val_indices].reshape(len(val_indices), 1, impedance.shape[1], 1)
-    seismic = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in range(2, 2718)]), axis=1).transpose(0,1,3,2)
+    seismic = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in range(452, 2399)]), axis=1).transpose(0,1,3,2)
 
     # Standardize features and targets
     x_train_norm, y_train_norm = (x_train - x_train.mean()) / x_train.std(), (y_train - y_train.mean()) / y_train.std()
@@ -139,7 +139,7 @@ def train(args):
     else:
         print('Saving results...')
 
-    np.save(pjoin(results_directory, 'AI.npy'), marmousi_model().T[2:2718, 100:600])
+    np.save(pjoin(results_directory, 'AI.npy'), marmousi_model().T[452:2399, 100:600])
     np.save(pjoin(results_directory, 'AI_inv.npy'), AI_inv.detach().cpu().numpy().squeeze())
     print('Results successfully saved.')
 

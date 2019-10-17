@@ -11,7 +11,7 @@ import segyio
 
 def marmousi_seismic():
     """Function returns the seismic data that comes with the marmousi model"""
-    seismic = segyio.cube(pjoin('data', 'SYNTHETIC.segy'))
+    seismic = segyio.cube(pjoin('data', 'Kirchhoff_PoSDM.segy'))
     seismic = np.transpose(seismic, axes=[1, 0, 2])
     return seismic
 
