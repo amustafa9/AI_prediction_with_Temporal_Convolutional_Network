@@ -12,7 +12,7 @@ from core.model import *
 from core.results import *
 
 # Fix the random seeds
-torch.manual_seed(2561716316833428258)
+#torch.manual_seed(2561716316833428258)
 torch.backends.cudnn.deterministic = True
 if torch.cuda.is_available(): torch.cuda.manual_seed_all(2019)
 np.random.seed(seed=2019)
@@ -27,18 +27,18 @@ def train_val_split(args):
     standardize both the training and validation datasets.
     """
     # Load data
-    seismic_offsets = marmousi_seismic().squeeze()[:, 100:600]  # dim= No_of_gathers x trace_length
-    impedance = marmousi_model().T[:, 100:600]  # dim = No_of_traces x trace_length
+    seismic = seam_seismic().squeeze()  # dim= No_of_gathers x trace_length
+    impedance = seam_model()  # dim = No_of_traces x trace_length
 
 
     # Split into train and val
-    train_indices = np.linspace(452, 2399, args.n_wells).astype(int)
-    val_indices = np.setdiff1d(np.arange(452, 2399).astype(int), train_indices)
-    x_train = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in train_indices]), axis=1).transpose(0, 1, 3, 2)
+    train_indices = np.linspace(2, len(seismic)-3, args.n_wells).astype(int)
+    val_indices = np.setdiff1d(np.arange(1, len(seismic)-2).astype(int), train_indices)
+    x_train = np.expand_dims(np.array([seismic[i-2:i+3] for i in train_indices]), axis=1).transpose(0, 1, 3, 2)
     y_train = impedance[train_indices].reshape(len(train_indices), 1, impedance.shape[1], 1)
-    x_val = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in val_indices]), axis=1).transpose(0,1,3,2)
+    x_val = np.expand_dims(np.array([seismic[i-2:i+3] for i in val_indices]), axis=1).transpose(0,1,3,2)
     y_val = impedance[val_indices].reshape(len(val_indices), 1, impedance.shape[1], 1)
-    seismic = np.expand_dims(np.array([seismic_offsets[i-2:i+3] for i in range(452, 2399)]), axis=1).transpose(0,1,3,2)
+    seismic = np.expand_dims(np.array([seismic[i-2:i+3] for i in range(1, len(seismic)-2)]), axis=1).transpose(0,1,3,2)
 
     # Standardize features and targets
     x_train_norm, y_train_norm = (x_train - x_train.mean()) / x_train.std(), (y_train - y_train.mean()) / y_train.std()
@@ -56,22 +56,20 @@ def train(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load splits
-    x_train, y_train, x_val, y_val, seismic = train_val_split(args)
-
-    # Convert to torch tensors in the form (N, C, L)
-    x_train = torch.from_numpy(x_train).float().to(device)
-    y_train = torch.from_numpy(y_train).float().to(device)
-    x_val = torch.from_numpy(x_val).float().to(device)
-    y_val = torch.from_numpy(y_val).float().to(device)
-    seismic = torch.from_numpy(seismic).float().to(device='cpu')
-
+    AI = seam_model()
+    x_indices = { 'training_indices': np.arange(3, 1502, 30),
+                  'validation_indices': np.array([6, 9, 12, 15])
+    }
     # Set up the dataloader for training dataset
-    dataset = SeismicLoader(x_train, y_train)
-    train_loader = DataLoader(dataset=dataset,
-                              batch_size=args.batch_size,
+    train_dataset = SeismicLoader2D(x_indices, AI, mode='train')
+    train_loader = DataLoader(dataset=train_dataset,
+                              batch_size=len(train_dataset),
                               shuffle=False)
 
+    val_dataset = SeismicLoader2D(x_indices, AI, mode='val')
+    val_loader = DataLoader(dataset=val_dataset,
+                              batch_size=len(val_dataset),
+                              shuffle=False)
     # import tcn
     model = TCN(1,
                 1,
@@ -102,13 +100,15 @@ def train(args):
             optimizer.step()
             train_loss.append(loss.item())
             writer.add_scalar(tag='Training Loss', scalar_value=loss.item(), global_step=iter)
-            if epoch % 100 == 0:
+            if epoch % 200 == 0:
                 with torch.no_grad():
                     model.eval()
-                    y_pred = model(x_val)
-                    loss = criterion(y_pred, y_val)
-                    val_loss.append(loss.item())
-                    writer.add_scalar(tag='Validation Loss', scalar_value=loss.item(), global_step=iter)
+                    for x,y in val_loader:
+                        y_pred = model(x)
+                        loss = criterion(y_pred, y)
+                        val_loss.append(loss.item())
+                        writer.add_scalar(tag='Validation Loss', scalar_value=loss.item(), global_step=iter)
+
             print('epoch:{} - Training loss: {:0.4f} | Validation loss: {:0.4f}'.format(epoch,
                                                                                         train_loss[-1],
                                                                                         val_loss[-1]))
@@ -125,13 +125,19 @@ def train(args):
 
     writer.close()
 
+    x_indices = {'training_indices':[9],
+                 'validation_indices':np.arange(3, 1502,3)
+    }
+    test_dataset = SeismicLoader2D(x_indices, AI, mode='test')
+    test_loader = DataLoader(test_dataset, batch_size=len(test_dataset))
 
     # Set up directory to save results
     results_directory = 'results'
     with torch.no_grad():
         model.eval()
-        model.cpu()
-        AI_inv = model(seismic)
+        for x,y in test_loader:
+            AI_inv = model(x)
+
 
     if not os.path.exists(results_directory):  # Make results directory if it doesn't already exist
         os.mkdir(results_directory)
@@ -139,7 +145,7 @@ def train(args):
     else:
         print('Saving results...')
 
-    np.save(pjoin(results_directory, 'AI.npy'), marmousi_model().T[452:2399, 100:600])
+    np.save(pjoin(results_directory, 'AI.npy'), marmousi_model().T[452:2399, 400:2400])
     np.save(pjoin(results_directory, 'AI_inv.npy'), AI_inv.detach().cpu().numpy().squeeze())
     print('Results successfully saved.')
 
@@ -150,7 +156,7 @@ if __name__ == "__main__":
                         help='# of the epochs. Default = 1000')
     parser.add_argument('--batch_size', nargs='?', type=int, default=10,
                         help='Batch size. Default = 1.')
-    parser.add_argument('--tcn_layer_channels', nargs='+', type=int, default=[3, 5, 5, 5, 6, 6, 6, 6],
+    parser.add_argument('--tcn_layer_channels', nargs='+', type=int, default=[3],
                         help='No of channels in each temporal block of the tcn. Default = numbers reported in paper')
     parser.add_argument('--kernel_size', nargs='?', type=int, default=5,
                         help='kernel size for the tcn. Default = 5')

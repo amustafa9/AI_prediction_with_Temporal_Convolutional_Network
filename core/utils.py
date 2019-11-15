@@ -20,12 +20,29 @@ def marmousi_model():
     """Function returns the marmousi acoustic impedance model"""
     den_file = segyio.open(pjoin('data', 'MODEL_DENSITY_1.25m.segy'))
     rho = segyio.cube(den_file).squeeze().T
-    rho = rho[::4, ::5]
+    rho = rho[:, ::5]
     v_file = segyio.open('./data/MODEL_P-WAVE_VELOCITY_1.25m.segy')
     vp = segyio.cube(v_file).squeeze().T
-    vp = vp[::4, ::5]
+    vp = vp[:, ::5]
     AI = vp * rho
     return AI
 
 
-marmousi_seismic()
+def seam_seismic():
+    """Function returns poststack SEAM seismic"""
+    seismic = segyio.cube(pjoin('data', 'SEAM_Interpretation_Challenge_1_Depth.sgy'))
+    seismic = np.squeeze(seismic)[:, 1:, :]
+    return seismic
+
+
+def seam_model():
+    """Function returns acoustic impedance traces aligned with the seismic offset data returned by function above"""
+    first_aligned_model_trace = 125  # 1st model trace that aligns exactly with the first seismic trace obtained by the function above
+    last_aligned_model_trace = 1627  # Last aligned model trace that aligns with the last seismic trace obtained from function above
+    velocity_file = segyio.open(pjoin('data', 'SEAM_Vp_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
+    velocity_model = np.array([velocity_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
+    density_file = segyio.open(pjoin('data','SEAM_Den_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
+    density_model = np.array([density_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
+    AI = velocity_model * density_model
+    return AI
+

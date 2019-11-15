@@ -36,7 +36,7 @@ def evaluate(args):
 
 def plot(img, cmap='rainbow', cbar_label=r'AI ($m/s\times g/cm^3$)', vmin=None, vmax=None):
     """Makes seaborn style plots"""
-    dt = 0.00466
+    dt = 0.001165582791395698
     dx = 6.247687564234327
     Y, X = np.mgrid[slice(0.47, 2.8 + dt, dt), slice(2824, 14982 + dx, dx)]
 
@@ -121,7 +121,7 @@ def trace_plot(AI, AI_inv, val_indices):
 
     x = AI[inds]
     y = AI_inv[inds]
-    time = np.linspace(0.47, 2.8, 500)
+    time = np.linspace(0.47, 2.8, 2000)
     fig, ax = plt.subplots(1, x.shape[0], figsize=(10, 12), sharey=True)
 
     max = np.max([y.max(), x.max()]) * 1.2

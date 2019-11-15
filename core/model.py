@@ -71,7 +71,11 @@ class TCN(nn.Module):
         self.tcn = TemporalConvNet(input_size, num_channels, kernel_size=(kernel_size, 3), dropout=dropout)
         self.global_residual = nn.Conv1d(input_size, output_size, kernel_size=1)  # Global skip from input to last layer
         self.out = nn.Linear(num_channels[-1]+1, output_size)
-        self.out2 = nn.Linear(5, 1)
+        self.onexoneconv = nn.Conv2d(in_channels=num_channels[-1]+1, out_channels=1, kernel_size=(1,3), padding=(0,0))
+        self.lstm = nn.LSTM(input_size=1, hidden_size=10, batch_first=True, bidirectional=True)
+        self.deconv1 = nn.ConvTranspose1d(20, 1, kernel_size=3, stride=2, padding=1, dilation=1)
+        self.deconv2 = nn.ConvTranspose1d(5, 1, kernel_size=6, stride=2, padding=1, dilation=1)
+        self.out2 = nn.Linear(20, 1)
         self.weight_init_res()
 
     def weight_init_res(self):
@@ -79,10 +83,20 @@ class TCN(nn.Module):
 
     def forward(self, inputs):
         """Inputs have to have dimension (N, C_in, L_in)"""
-        y = self.tcn(inputs)  # input should have dimension (N, C, L)
+        y = self.tcn(inputs)  # input should have dimension (N, C, H, W)
         y = torch.cat((y, inputs), dim=1)
-        out = self.out(y.transpose(1, 3)).transpose(1, 3)
-        out = self.out2(out)
-        return out
+        y = F.relu(self.onexoneconv(y)).squeeze(1)
+        y, _ = self.lstm(y)
+        y = self.deconv1(y.transpose(1,2)).squeeze()
+
+
+        #out = self.out(y.transpose(1, 3)).transpose(1, 3)  # reduces number of 'image channels" to 1. But each activation is still a 2-D image
+        # out = self.onexoneconv(y)
+        # out = out.squeeze(1)
+        # out, _ = self.lstm(out)
+        # out = self.deconv1(out.transpose(1,2))
+        # out = self.deconv2(out).unsqueeze(-1)
+        #out = self.out2(out).transpose(1,2).unsqueeze(-1)
+        return y
 
 
