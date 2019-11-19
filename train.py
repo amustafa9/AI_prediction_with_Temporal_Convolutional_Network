@@ -18,36 +18,6 @@ if torch.cuda.is_available(): torch.cuda.manual_seed_all(2019)
 np.random.seed(seed=2019)
 
 
-# Define function to perform train-val split
-def train_val_split(args):
-    """Splits dataset into training and validation based on the number of well-logs specified by the user.
-
-    The training traces are sampled uniformly along the length of the model. The validation data is all of the
-    AI model except the training traces. Mean and Standard deviation are computed on the training data and used to
-    standardize both the training and validation datasets.
-    """
-    # Load data
-    seismic = seam_seismic().squeeze()  # dim= No_of_gathers x trace_length
-    impedance = seam_model()  # dim = No_of_traces x trace_length
-
-
-    # Split into train and val
-    train_indices = np.linspace(2, len(seismic)-3, args.n_wells).astype(int)
-    val_indices = np.setdiff1d(np.arange(1, len(seismic)-2).astype(int), train_indices)
-    x_train = np.expand_dims(np.array([seismic[i-2:i+3] for i in train_indices]), axis=1).transpose(0, 1, 3, 2)
-    y_train = impedance[train_indices].reshape(len(train_indices), 1, impedance.shape[1], 1)
-    x_val = np.expand_dims(np.array([seismic[i-2:i+3] for i in val_indices]), axis=1).transpose(0,1,3,2)
-    y_val = impedance[val_indices].reshape(len(val_indices), 1, impedance.shape[1], 1)
-    seismic = np.expand_dims(np.array([seismic[i-2:i+3] for i in range(1, len(seismic)-2)]), axis=1).transpose(0,1,3,2)
-
-    # Standardize features and targets
-    x_train_norm, y_train_norm = (x_train - x_train.mean()) / x_train.std(), (y_train - y_train.mean()) / y_train.std()
-    x_val_norm, y_val_norm = (x_val - x_train.mean()) / x_train.std(), (y_val - y_train.mean()) / y_train.std()
-    seismic = (seismic - x_train.mean()) / x_train.std()
-
-    return x_train_norm, y_train_norm, x_val_norm, y_val_norm, seismic
-
-
 # Define train function
 def train(args):
     """Sets up the model to train"""
