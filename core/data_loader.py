@@ -27,17 +27,22 @@ class SeismicLoader2D(Dataset):
         """
 
         # Normalize and standardize the training data
-        self.seismic = segyio.cube(pjoin('data', 'SEAM_Interpretation_Challenge_1_Depth.sgy'))
+        self.seismic = segyio.cube(pjoin('data', 'SEAM_Interpretation_Challenge_1_2DGathers_Depth.sgy')).squeeze()
         self.x_indices = x_indices
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model
         self.section, self.model, self.indices = self.standardize(mode)
 
     def standardize(self, mode):
-        seismic = self.seismic
+        seismic = np.mean(self.seismic, axis=1)
         seismic_normalized = (seismic - seismic.mean()) / seismic.std()
-        section = torch.tensor(seismic_normalized[714], dtype=torch.float).to(self.device)  # get the matching seismic section at 23910 m compared to model at 23900 m
+        section = torch.tensor(seismic_normalized, dtype=torch.float).to(self.device)
         model = self.model
+
+        # Comment the following two lines if you do not want water and salt region to bet cut down and model to downsampled
+        section = section[:, 90:]  # Cut water from seismic
+        model = model[:,180:][:,::2]  # Cut water from model and also downsample to bring to seismic resolution in depth
+
         train_indices = self.x_indices['training_indices']
         model = torch.tensor((model - model[train_indices].mean()) / model[train_indices].std(),
                              dtype=torch.float).to(self.device)
@@ -61,7 +66,7 @@ class SeismicLoader2D(Dataset):
 
     def __getitem__(self, index):
         model_index = self.indices[index]
-        seismic_index = np.int(model_index/3 * 2)
+        seismic_index = np.int(model_index/3 * 2 + 1)
         x = self.section[seismic_index-1:seismic_index+2]  # each seismic input is 3 traces thick and full depth in length
         x = torch.transpose(x,0,1)  # arrange it in H x W format
         x = torch.unsqueeze(x, 0).to(self.device)  # Add channel dimension at the 0th place
@@ -77,5 +82,4 @@ class InvalidIndex(Exception):
     """Raised when an invalid index is used for the model"""
     def __init__(self):
         pass
-
 

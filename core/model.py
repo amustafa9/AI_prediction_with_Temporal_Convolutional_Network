@@ -65,38 +65,52 @@ class TemporalConvNet(nn.Module):
         return self.network(x)
 
 
-class TCN(nn.Module):
-    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
-        super(TCN, self).__init__()
-        self.tcn = TemporalConvNet(input_size, num_channels, kernel_size=(kernel_size, 3), dropout=dropout)
-        self.global_residual = nn.Conv1d(input_size, output_size, kernel_size=1)  # Global skip from input to last layer
-        self.out = nn.Linear(num_channels[-1]+1, output_size)
-        self.onexoneconv = nn.Conv2d(in_channels=num_channels[-1]+1, out_channels=1, kernel_size=(1,3), padding=(0,0))
-        self.lstm = nn.LSTM(input_size=1, hidden_size=10, batch_first=True, bidirectional=True)
-        self.deconv1 = nn.ConvTranspose1d(20, 1, kernel_size=3, stride=2, padding=1, dilation=1)
-        self.deconv2 = nn.ConvTranspose1d(5, 1, kernel_size=6, stride=2, padding=1, dilation=1)
-        self.out2 = nn.Linear(20, 1)
-        self.weight_init_res()
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
+        self.global_context_encoder = nn.LSTM(input_size=1, hidden_size=10, batch_first=True, num_layers=2)
 
-    def weight_init_res(self):
-        self.global_residual.weight.data.normal_(0, 0.01)
+        self.aspp_conv1 = nn.Conv2d(in_channels=1,
+                                    out_channels=1,
+                                    kernel_size=(5,3),
+                                    dilation=(1,1),
+                                    padding=(2,1)
+                                    )
 
-    def forward(self, inputs):
-        """Inputs have to have dimension (N, C_in, L_in)"""
-        y = self.tcn(inputs)  # input should have dimension (N, C, H, W)
-        y = torch.cat((y, inputs), dim=1)
-        y = F.relu(self.onexoneconv(y)).squeeze(1)
-        y, _ = self.lstm(y)
-        y = self.deconv1(y.transpose(1,2)).squeeze()
+        self.aspp_conv2 = nn.Conv2d(in_channels=1,
+                                    out_channels=1,
+                                    kernel_size=(5,3),
+                                    dilation=(3,1),
+                                    padding=(6,1)
+                                    )
 
+        self.aspp_conv3 = nn.Conv2d(in_channels=1,
+                                    out_channels=1,
+                                    kernel_size=(5,3),
+                                    dilation=(6,1),
+                                    padding=(12,1)
+                                    )
 
-        #out = self.out(y.transpose(1, 3)).transpose(1, 3)  # reduces number of 'image channels" to 1. But each activation is still a 2-D image
-        # out = self.onexoneconv(y)
-        # out = out.squeeze(1)
-        # out, _ = self.lstm(out)
-        # out = self.deconv1(out.transpose(1,2))
-        # out = self.deconv2(out).unsqueeze(-1)
-        #out = self.out2(out).transpose(1,2).unsqueeze(-1)
-        return y
+        self.onebyoneconv = nn.Conv1d(in_channels=10,
+                                      out_channels=1,
+                                      kernel_size=1)
+
+        self.cnn_concat = nn.Conv1d(in_channels=6,
+                                    out_channels=1,
+                                    kernel_size=1
+                                    )
+
+    def forward(self, input):
+        global_y, _ = self.global_context_encoder(input.squeeze()[:,:,[1]])
+        # global_y = self.onebyoneconv(torch.transpose(global_y, 1,2))
+        # local_y1 = F.relu(self.aspp_conv1(input))
+        # local_y2 = F.relu(self.aspp_conv2(input))
+        # local_y3 = F.relu(self.aspp_conv3(input))
+        # local = torch.cat((local_y1, local_y2, local_y3), dim=1)
+        # local = torch.mean(local, dim=3).squeeze(-1)
+        # out = torch.cat((global_y, local), dim=1)
+        out = self.onebyoneconv(torch.transpose(global_y, 1,2))
+
+        return out
 
 

@@ -41,11 +41,7 @@ def train(args):
                               batch_size=len(val_dataset),
                               shuffle=False)
     # import tcn
-    model = TCN(1,
-                1,
-                args.tcn_layer_channels,
-                args.kernel_size,
-                args.dropout).to(device)
+    model = Model().to(device)
 
     # Set up loss
     criterion = torch.nn.MSELoss()
@@ -96,7 +92,7 @@ def train(args):
     writer.close()
 
     x_indices = {'training_indices':[9],
-                 'validation_indices':np.arange(3, 1502,3)
+                 'validation_indices':np.arange(3, 1495, 3)
     }
     test_dataset = SeismicLoader2D(x_indices, AI, mode='test')
     test_loader = DataLoader(test_dataset, batch_size=len(test_dataset))
@@ -106,8 +102,9 @@ def train(args):
     with torch.no_grad():
         model.eval()
         for x,y in test_loader:
-            AI_inv = model(x)
+            AI_inv = model(x).squeeze()
 
+    plt.imshow(AI_inv.detach().cpu().transpose(0, 1)), plt.show()
 
     if not os.path.exists(results_directory):  # Make results directory if it doesn't already exist
         os.mkdir(results_directory)
@@ -126,7 +123,7 @@ if __name__ == "__main__":
                         help='# of the epochs. Default = 1000')
     parser.add_argument('--batch_size', nargs='?', type=int, default=10,
                         help='Batch size. Default = 1.')
-    parser.add_argument('--tcn_layer_channels', nargs='+', type=int, default=[3],
+    parser.add_argument('--tcn_layer_channels', nargs='+', type=int, default=[3, 3, 3, 3, 3],
                         help='No of channels in each temporal block of the tcn. Default = numbers reported in paper')
     parser.add_argument('--kernel_size', nargs='?', type=int, default=5,
                         help='kernel size for the tcn. Default = 5')
