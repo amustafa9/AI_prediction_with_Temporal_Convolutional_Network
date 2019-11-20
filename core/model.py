@@ -65,51 +65,77 @@ class TemporalConvNet(nn.Module):
         return self.network(x)
 
 
+class TCN(nn.Module):
+    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
+        super(TCN, self).__init__()
+        self.tcn = TemporalConvNet(input_size, num_channels, kernel_size=(kernel_size, 3), dropout=dropout)
+        self.global_residual = nn.Conv1d(input_size, output_size, kernel_size=1)  # Global skip from input to last layer
+        self.out = nn.Linear(num_channels[-1]+1, output_size)
+        self.out2 = nn.Linear(3, 1)
+        self.weight_init_res()
+
+    def weight_init_res(self):
+        self.global_residual.weight.data.normal_(0, 0.01)
+
+    def forward(self, inputs):
+        """Inputs have to have dimension (N, C_in, L_in)"""
+        y = self.tcn(inputs)  # input should have dimension (N, C, L)
+        y = torch.cat((y, inputs), dim=1)
+        out = self.out(y.transpose(1, 3)).transpose(1, 3)
+        out = self.out2(out).squeeze()
+        return out
+
+
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
         self.global_context_encoder = nn.LSTM(input_size=1, hidden_size=10, batch_first=True, num_layers=2)
 
-        self.aspp_conv1 = nn.Conv2d(in_channels=1,
-                                    out_channels=1,
+        self.aspp_conv1 = nn.Sequential(nn.Conv2d(in_channels=1,
+                                    out_channels=10,
                                     kernel_size=(5,3),
                                     dilation=(1,1),
                                     padding=(2,1)
-                                    )
+                                    ),
+                                    nn.GroupNorm(num_groups=1,
+                                    num_channels=10))
 
-        self.aspp_conv2 = nn.Conv2d(in_channels=1,
-                                    out_channels=1,
+        self.aspp_conv2 = nn.Sequential(nn.Conv2d(in_channels=1,
+                                    out_channels=10,
                                     kernel_size=(5,3),
                                     dilation=(3,1),
                                     padding=(6,1)
-                                    )
+                                    ),
+                                    nn.GroupNorm(num_groups=1,
+                                                     num_channels=10))
 
-        self.aspp_conv3 = nn.Conv2d(in_channels=1,
-                                    out_channels=1,
-                                    kernel_size=(5,3),
-                                    dilation=(6,1),
-                                    padding=(12,1)
-                                    )
+        self.aspp_conv3 = nn.Sequential(nn.Conv2d(in_channels=1,
+                                        out_channels=10,
+                                        kernel_size=(5,3),
+                                        dilation=(6,1),
+                                        padding=(12,1)
+                                        ),
+                                        nn.GroupNorm(num_groups=1,num_channels=10))
 
         self.onebyoneconv = nn.Conv1d(in_channels=10,
                                       out_channels=1,
                                       kernel_size=1)
 
-        self.cnn_concat = nn.Conv1d(in_channels=6,
+        self.cnn_concat = nn.Conv1d(in_channels=30,
                                     out_channels=1,
                                     kernel_size=1
                                     )
 
     def forward(self, input):
         global_y, _ = self.global_context_encoder(input.squeeze()[:,:,[1]])
-        # global_y = self.onebyoneconv(torch.transpose(global_y, 1,2))
-        # local_y1 = F.relu(self.aspp_conv1(input))
-        # local_y2 = F.relu(self.aspp_conv2(input))
-        # local_y3 = F.relu(self.aspp_conv3(input))
-        # local = torch.cat((local_y1, local_y2, local_y3), dim=1)
-        # local = torch.mean(local, dim=3).squeeze(-1)
-        # out = torch.cat((global_y, local), dim=1)
-        out = self.onebyoneconv(torch.transpose(global_y, 1,2))
+        global_y = self.onebyoneconv(torch.transpose(global_y, 1,2))
+        local_y1 = F.relu(self.aspp_conv1(input))
+        local_y2 = F.relu(self.aspp_conv2(input))
+        local_y3 = F.relu(self.aspp_conv3(input))
+        local = torch.cat((local_y1, local_y2, local_y3), dim=1)
+        out = torch.mean(local, dim=3).squeeze(-1)
+        #out = torch.cat((global_y, local), dim=1)
+        out = self.cnn_concat(out)
 
         return out
 

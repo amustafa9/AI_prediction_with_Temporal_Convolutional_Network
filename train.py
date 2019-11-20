@@ -41,7 +41,8 @@ def train(args):
                               batch_size=len(val_dataset),
                               shuffle=False)
     # import tcn
-    model = Model().to(device)
+    #model = Model().to(device)
+    model = TCN(1,1,[3,3,5,5,6,3], 5, 0.2).to(device)
 
     # Set up loss
     criterion = torch.nn.MSELoss()
