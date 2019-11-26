@@ -26,17 +26,17 @@ def train(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    AI = seam_model()
+    elastic_model = seam_model()
     x_indices = { 'training_indices': np.arange(3, 1502, 90),
                   'validation_indices': np.array([6, 9, 12, 15])
     }
     # Set up the dataloader for training dataset
-    train_dataset = SeismicLoader2D(x_indices, AI, mode='train')
+    train_dataset = SeismicLoader2D(x_indices, elastic_model, mode='train')
     train_loader = DataLoader(dataset=train_dataset,
                               batch_size=len(train_dataset),
                               shuffle=False)
 
-    val_dataset = SeismicLoader2D(x_indices, AI, mode='val')
+    val_dataset = SeismicLoader2D(x_indices, elastic_model, mode='val')
     val_loader = DataLoader(dataset=val_dataset,
                               batch_size=len(val_dataset),
                               shuffle=False)
@@ -44,13 +44,16 @@ def train(args):
     x_indices = {'training_indices':[9],
                  'validation_indices':np.arange(3, 1495, 3)
     }
-    test_dataset = SeismicLoader2D(x_indices, AI, mode='test')
+    test_dataset = SeismicLoader2D(x_indices, elastic_model, mode='test')
     test_loader = DataLoader(test_dataset, batch_size=len(test_dataset))
 
 
     # import tcn
     #model = Model().to(device)
-    model = TCN(1,1,[3,3,5,5,6,3], 5, 0.2).to(device)
+    model = TCN(30,1,[3, 5, 5, 10, 20, 30, 40], 5, 0.4).to(device)
+
+    for param in model.synthesis.parameters():
+        param.requires_grad=True
 
     # Set up loss
     criterion = torch.nn.MSELoss()
@@ -67,33 +70,26 @@ def train(args):
     # Start training
     for epoch in range(args.n_epoch):
         for x_train, y_train in train_loader:
-            for x_test,_ in test_loader:
+            for x_test, y_test in test_loader:
                 model.train()
                 optimizer.zero_grad()
-                y_pred, _ = model(x_train)
-                loss1 = criterion(y_pred, y_train)
+                y_pred, x_hat = model(x_train)
                 _, x_hat = model(x_test)
-                loss2 = criterion(x_test, x_hat)
+                loss1 = criterion(y_pred, y_train)
+                loss2 = criterion(x_hat, x_test)
                 loss = loss1 + 0.5*loss2
                 loss.backward()
                 optimizer.step()
-                train_loss.append(loss.item())
+                train_loss.append(loss1.item())
                 writer.add_scalar(tag='Training Loss', scalar_value=loss.item(), global_step=iter)
-                if epoch % 200 == 0:
+                if epoch % 20 == 0:
                     with torch.no_grad():
                         model.eval()
-                        for x, y in val_loader:
-                            y_pred, x_hat = model(x)
-                            loss = criterion(y_pred, y)
-                            val_loss.append(loss.item())
-                            writer.add_scalar(tag='Validation Loss', scalar_value=loss.item(), global_step=iter)
-                            AI_inv, seismic_reconstructed = model(x_test)
-                            plt.imshow(AI_inv.detach().cpu().transpose(0, 1)), plt.xticks(
-                                ticks=np.linspace(0, AI_inv.shape[0], 5),
-                                labels=np.linspace(2490, 32520, 5))
-                            plt.axes().set_aspect(498 / 661), plt.colorbar()
-                            plt.xlabel('Distance Easting (Km)')
-                            plt.ylabel('Depth'), plt.show()
+                        y_pred, x_hat = model(x_test)
+                        loss = criterion(y_pred, y_test)
+                        val_loss.append(loss.item())
+                        writer.add_scalar(tag='Validation Loss', scalar_value=loss.item(), global_step=iter)
+
                 print('epoch:{} - Training loss: {:0.4f} | Validation loss: {:0.4f}'.format(epoch,
                                                                                             train_loss[-1],
                                                                                             val_loss[-1]))
@@ -116,7 +112,15 @@ def train(args):
         model.eval()
         for x,y in test_loader:
             AI_inv, seismic_reconstructed = model(x)
-
+            AI_inv = AI_inv.detach().cpu()
+            y = y.detach().cpu()
+            titles=['Predicted Vp vs True Vp', 'Predicted Vs vs True Vs', 'Predicted Density vs True Density']
+            for i in range(3):
+                fig, (ax1,ax2) = plt.subplots(1,2)
+                ax1.imshow(AI_inv[:,i,:].transpose(0,1))
+                ax2.imshow(y[:,i,:].transpose(0,1))
+                plt.suptitle(titles[i])
+                plt.show()
     plt.imshow(AI_inv.detach().cpu().transpose(0, 1)), plt.xticks(ticks=np.linspace(0, AI_inv.shape[0], 5),
                                                                   labels=np.linspace(2490, 32520, 5))
     plt.axes().set_aspect(498 / 661), plt.colorbar()

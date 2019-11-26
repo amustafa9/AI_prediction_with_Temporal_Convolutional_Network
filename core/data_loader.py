@@ -34,17 +34,18 @@ class SeismicLoader2D(Dataset):
         self.section, self.model, self.indices = self.standardize(mode)
 
     def standardize(self, mode):
-        seismic = np.mean(self.seismic, axis=1)
-        seismic_normalized = (seismic - seismic.mean()) / seismic.std()
+        #seismic = np.mean(self.seismic, axis=1)  # Averaging all channels to get one channel
+        seismic = self.seismic
+        seismic_normalized = (seismic - seismic.mean(axis=(0,2), keepdims=True)) / seismic.std(axis=(0,2), keepdims=True)  # Normalizing channel to have 0 mean and 1 std
         section = torch.tensor(seismic_normalized, dtype=torch.float).to(self.device)
         model = self.model
 
         # Comment the following two lines if you do not want water and salt region to bet cut down and model to downsampled
-        section = section[:, 90:]  # Cut water from seismic
-        model = model[:,180:][:,::2]  # Cut water from model and also downsample to bring to seismic resolution in depth
+        section = section[:, :, 90:]  # Cut water from seismic
+        model = model[:,:,180:][:,:,::2]  # Cut water from model and also downsample to bring to seismic resolution in depth
 
         train_indices = self.x_indices['training_indices']
-        model = torch.tensor((model - model[train_indices].mean()) / model[train_indices].std(),
+        model = torch.tensor((model - model[train_indices].mean(axis=(0,2), keepdims=True)) / model[train_indices].std(axis=(0,2), keepdims=True),
                              dtype=torch.float).to(self.device)
         if mode == 'train':
             indices = self.x_indices['training_indices']
@@ -68,8 +69,7 @@ class SeismicLoader2D(Dataset):
         model_index = self.indices[index]
         seismic_index = np.int(model_index/3 * 2 + 1)
         x = self.section[seismic_index-1:seismic_index+2]  # each seismic input is 3 traces thick and full depth in length
-        x = torch.transpose(x,0,1)  # arrange it in H x W format
-        x = torch.unsqueeze(x, 0).to(self.device)  # Add channel dimension at the 0th place
+        x = x.transpose(0,1).transpose(1,2)  # arrange it in H x W format
         y = self.model[model_index].to(self.device)
         return x, y
 

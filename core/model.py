@@ -130,7 +130,24 @@ class TCN(nn.Module):
     def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
         super(TCN, self).__init__()
         self.tcn = TemporalConvNet2d(input_size, num_channels, kernel_size=(kernel_size, 3), dropout=dropout)
-        self.conv = nn.Conv2d(in_channels=4, out_channels=1, kernel_size=(1, 3))
+        self.groupnorm = nn.GroupNorm(num_channels=num_channels[-1], num_groups=1)
+        self.conv = nn.Sequential(nn.Conv2d(in_channels=num_channels[-1],
+                                            out_channels=20,
+                                            kernel_size=(1, 3),
+                                            padding=(0, 1)),
+                                  nn.ReLU(),
+                                  nn.GroupNorm(num_channels=20, num_groups=1),
+                                  nn.Conv2d(in_channels=20,
+                                            out_channels=10,
+                                            kernel_size=(1, 3),
+                                            padding=(0, 1)),
+                                  nn.ReLU(),
+                                  nn.GroupNorm(num_channels=10, num_groups=1),
+                                  nn.Conv2d(in_channels=10,
+                                            out_channels=1,
+                                            kernel_size=(1, 3),
+                                            padding=(0, 1)))
+
         self.synthesis = nn.Sequential(weight_norm(nn.Conv2d(in_channels=num_channels[-1],
                                                              out_channels=5,
                                                              kernel_size=(5, 3),
@@ -139,15 +156,22 @@ class TCN(nn.Module):
                                        nn.GroupNorm(num_channels=5,
                                                     num_groups=1),
                                        weight_norm(nn.Conv2d(in_channels=5,
-                                                             out_channels=1,
+                                                             out_channels=10,
+                                                             kernel_size=(5, 3),
+                                                             padding=(2, 1))),
+                                       nn.ReLU(),
+                                       nn.GroupNorm(num_channels=10,
+                                                    num_groups=1),
+                                       weight_norm(nn.Conv2d(in_channels=10,
+                                                             out_channels=30,
                                                              kernel_size=(5, 3),
                                                              padding=(2, 1))))
 
     def forward(self, inputs):
         """Inputs have to have dimension (N, C_in, L_in)"""
-        y = self.tcn(inputs)  # input should have dimension (N, C, L)
-        y_1 = torch.cat((y, inputs), dim=1)
-        out = self.conv(y_1).squeeze()
+        y = self.tcn(inputs)  # input should have dimension (N, C, H, W)
+        y = self.groupnorm(y)
+        out = self.conv(y).squeeze().transpose(1, 2)
         x_hat = self.synthesis(y)
         return out, x_hat
 

@@ -39,10 +39,15 @@ def seam_model():
     """Function returns acoustic impedance traces aligned with the seismic offset data returned by function above"""
     first_aligned_model_trace = 125  # 1st model trace that aligns exactly with the first seismic trace obtained by the function above
     last_aligned_model_trace = 1627  # Last aligned model trace that aligns with the last seismic trace obtained from function above
-    velocity_file = segyio.open(pjoin('data', 'SEAM_Vp_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
-    velocity_model = np.array([velocity_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
-    density_file = segyio.open(pjoin('data','SEAM_Den_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
-    density_model = np.array([density_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
-    AI = velocity_model * density_model
-    return AI
+    vp_file = segyio.open(pjoin('data', 'SEAM_Vp_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
+    vp = np.array([vp_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
+    vp = vp[:, np.newaxis, :]
+    vs_file = segyio.open(pjoin('data', 'SEAM_Vs_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
+    vs = np.array([vs_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
+    vs = vs[:, np.newaxis,:]
+    rho_file = segyio.open(pjoin('data','SEAM_Den_Elastic_N23900.sgy'), 'r', ignore_geometry=True)
+    rho = np.array([rho_file.trace[i] for i in np.arange(first_aligned_model_trace, last_aligned_model_trace)])
+    rho = rho[:, np.newaxis,:]
+    elastic_model = np.concatenate((vp,vs,rho), axis=1)
+    return elastic_model
 
