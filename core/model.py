@@ -146,7 +146,7 @@ class TCN(nn.Module):
                                   nn.Conv2d(in_channels=10,
                                             out_channels=1,
                                             kernel_size=(1, 3),
-                                            padding=(0, 1)))
+                                            padding=(0, 0)))
 
         self.synthesis = nn.Sequential(weight_norm(nn.Conv2d(in_channels=num_channels[-1],
                                                              out_channels=5,
@@ -171,7 +171,7 @@ class TCN(nn.Module):
         """Inputs have to have dimension (N, C_in, L_in)"""
         y = self.tcn(inputs)  # input should have dimension (N, C, H, W)
         y = self.groupnorm(y)
-        out = self.conv(y).squeeze().transpose(1, 2)
+        out = self.conv(y).squeeze(1).transpose(1, 2)
         x_hat = self.synthesis(y)
         return out, x_hat
 
@@ -179,134 +179,10 @@ class TCN(nn.Module):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.lstm = nn.LSTM(input_size=2, hidden_size=10, batch_first=True, num_layers=1)
-        self.tcn_global = TemporalConvNet(num_inputs=1, num_channels=[3, 3, 5, 5, 6, 6, 2], kernel_size=5, dropout=0.2)
-        self.tcn_local_1 = TemporalConvNet2d(num_inputs=1, num_channels=[3, 6, 6], kernel_size=(3, 3), dropout=0.2)
-        self.tcn_local_2 = TemporalConvNet2d(num_inputs=1, num_channels=[3, 5, 6, 6], kernel_size=(3, 3), dropout=0.2)
-        self.tcn_local_3 = TemporalConvNet2d(num_inputs=1, num_channels=[3, 5, 6, 6, 6], kernel_size=(5, 3),
-                                             dropout=0.2)
-
-        self.local_conv_block = nn.Sequential(
-            nn.Conv2d(in_channels=1,
-                      out_channels=3,
-                      kernel_size=(5, 3),
-                      dilation=(1, 1),
-                      padding=(2, 1)),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Conv2d(in_channels=3,
-                      out_channels=3,
-                      kernel_size=(5, 3),
-                      dilation=(1, 1),
-                      padding=(2, 1)),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Conv2d(in_channels=3,
-                      out_channels=9,
-                      kernel_size=(5, 3),
-                      dilation=(2, 1),
-                      padding=(4, 1)),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Conv2d(in_channels=9,
-                      out_channels=9,
-                      kernel_size=(5, 3),
-                      dilation=(2, 1),
-                      padding=(4, 1)),
-            nn.Dropout(0.4),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=9,
-                      out_channels=15,
-                      kernel_size=(5, 3),
-                      dilation=(4, 1),
-                      padding=(8, 1)),
-            nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Conv2d(in_channels=15,
-                      out_channels=15,
-                      kernel_size=(5, 3),
-                      dilation=(4, 1),
-                      padding=(8, 1)),
-            nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Conv2d(in_channels=15,
-                      out_channels=15,
-                      kernel_size=(5, 3),
-                      dilation=(8, 1),
-                      padding=(16, 1)),
-            nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Conv2d(in_channels=15,
-                      out_channels=9,
-                      kernel_size=(5, 3),
-                      dilation=(8, 1),
-                      padding=(16, 1)),
-            nn.ReLU(),
-            nn.GroupNorm(num_groups=1, num_channels=9)
-        )
-
-        self.aspp_conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=15,
-                      out_channels=3,
-                      kernel_size=(5, 3),
-                      dilation=(1, 1),
-                      padding=(2, 1)),
-            nn.GroupNorm(num_groups=1,
-                         num_channels=3)
-        )
-
-        self.aspp_conv2 = nn.Sequential(nn.Conv2d(in_channels=15,
-                                                  out_channels=3,
-                                                  kernel_size=(5, 3),
-                                                  dilation=(3, 1),
-                                                  padding=(6, 1)
-                                                  ),
-                                        nn.GroupNorm(num_groups=1, num_channels=3)
-                                        )
-
-        self.aspp_conv3 = nn.Sequential(nn.Conv2d(in_channels=15,
-                                                  out_channels=3,
-                                                  kernel_size=(5, 3),
-                                                  dilation=(6, 1),
-                                                  padding=(12, 1)
-                                                  ),
-                                        nn.GroupNorm(num_groups=1, num_channels=3)
-                                        )
-
-        self.conv1x1 = nn.Sequential(nn.Conv2d(in_channels=3,
-                                               out_channels=1,
-                                               kernel_size=(1, 5),
-                                               ))
-
-        self.conv1x1_2 = nn.Conv1d(in_channels=6, out_channels=2, kernel_size=1)
-
-        self.cnn_concat = nn.Conv1d(in_channels=2,
-                                    out_channels=1,
-                                    kernel_size=1
-                                    )
-
-        self.linear = nn.Linear(in_features=10, out_features=1)
+        self.tcn_local = TemporalConvNet(num_inputs=1, num_channels=[3, 10, 30, 60, 90, 120], kernel_size=5, dropout=0.2)
+        self.regression = nn.Conv1d(in_channels=120, out_channels=1, kernel_size=1)
 
     def forward(self, input):
-        global_y = F.relu(self.tcn_global(input.squeeze()[:, :, [1]].transpose(1, 2)))
-        local_y1 = F.relu(self.tcn_local_1(input))
-        local_y2 = F.relu(self.tcn_local_2(input))
-        local_y3 = F.relu(self.tcn_local_3(input))
-        local_y = local_y1 + local_y2
-
-        # local_y = torch.cat((local_y1, local_y2, local_y3), dim=1)
-        local_y = self.conv1x1(local_y.transpose(1, 3)).squeeze().transpose(1, 2)
-        # local_y = F.relu(self.conv1x1_2(local_y))
-        y = local_y + global_y
-        out, _ = self.lstm(y.transpose(1, 2))
-        out = self.linear(out).transpose(1, 2)
-        # local_features = self.local_conv_block(input)
-        # local_y1 = F.relu(self.aspp_conv1(local_features))
-        # local_y2 = F.relu(self.aspp_conv2(local_features))
-        # local_y3 = F.relu(self.aspp_conv3(local_features))
-        # local_y = torch.cat((local_y1, local_y2, local_y3), dim=1)
-        # local_y = self.linear(local_features).squeeze(-1)
-        # local_y = F.relu(self.conv1x1(local_y))
-        # out = local_y + global_y
-        # out = self.cnn_concat(out)
+        out = self.tcn_local(input[:,:,:,4])
+        out = self.regression(out)
         return out

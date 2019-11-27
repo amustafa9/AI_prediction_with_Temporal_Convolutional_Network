@@ -31,29 +31,24 @@ def train(args):
                   'validation_indices': np.array([6, 9, 12, 15])
     }
     # Set up the dataloader for training dataset
-    train_dataset = SeismicLoader2D(x_indices, elastic_model, mode='train')
+    train_dataset = SeismicLoader2D(x_indices, elastic_model, mode='train', data='offset')
     train_loader = DataLoader(dataset=train_dataset,
                               batch_size=len(train_dataset),
                               shuffle=False)
 
-    val_dataset = SeismicLoader2D(x_indices, elastic_model, mode='val')
-    val_loader = DataLoader(dataset=val_dataset,
-                              batch_size=len(val_dataset),
-                              shuffle=False)
-
     x_indices = {'training_indices':[9],
-                 'validation_indices':np.arange(3, 1495, 3)
+                 'validation_indices':np.arange(3, 1491, 3)
     }
-    test_dataset = SeismicLoader2D(x_indices, elastic_model, mode='test')
+    test_dataset = SeismicLoader2D(x_indices, elastic_model, mode='test', data='offset')
     test_loader = DataLoader(test_dataset, batch_size=len(test_dataset))
 
 
     # import tcn
     #model = Model().to(device)
-    model = TCN(30,1,[3, 5, 5, 10, 20, 30, 40], 5, 0.4).to(device)
-
+    model = TCN(30,1,[10, 30, 60, 90, 120], 9, 0.4).to(device)
+    #
     for param in model.synthesis.parameters():
-        param.requires_grad=True
+        param.requires_grad = True
 
     # Set up loss
     criterion = torch.nn.MSELoss()
@@ -74,18 +69,18 @@ def train(args):
                 model.train()
                 optimizer.zero_grad()
                 y_pred, x_hat = model(x_train)
-                _, x_hat = model(x_test)
+                #_, x_hat = model(x_test)
                 loss1 = criterion(y_pred, y_train)
-                loss2 = criterion(x_hat, x_test)
+                loss2 = criterion(x_hat, x_train)
                 loss = loss1 + 0.5*loss2
                 loss.backward()
                 optimizer.step()
-                train_loss.append(loss1.item())
+                train_loss.append(loss.item())
                 writer.add_scalar(tag='Training Loss', scalar_value=loss.item(), global_step=iter)
                 if epoch % 20 == 0:
                     with torch.no_grad():
                         model.eval()
-                        y_pred, x_hat = model(x_test)
+                        y_pred, _ = model(x_test)
                         loss = criterion(y_pred, y_test)
                         val_loss.append(loss.item())
                         writer.add_scalar(tag='Validation Loss', scalar_value=loss.item(), global_step=iter)
@@ -111,7 +106,7 @@ def train(args):
     with torch.no_grad():
         model.eval()
         for x,y in test_loader:
-            AI_inv, seismic_reconstructed = model(x)
+            AI_inv, _ = model(x)
             AI_inv = AI_inv.detach().cpu()
             y = y.detach().cpu()
             titles=['Predicted Vp vs True Vp', 'Predicted Vs vs True Vs', 'Predicted Density vs True Density']
