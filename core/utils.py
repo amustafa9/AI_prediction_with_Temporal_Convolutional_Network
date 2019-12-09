@@ -5,6 +5,7 @@ import os
 from os.path import join as pjoin
 
 import numpy as np
+from sklearn.metrics import r2_score
 
 import segyio
 
@@ -51,3 +52,11 @@ def seam_model():
     elastic_model = np.concatenate((vp,vs,rho), axis=1)
     return elastic_model
 
+
+def metrics(data1, data2):
+    """Function computes and returns metrics of r^2 and PCC on 2 equal sized arrays where each row is one observation
+    both data1 and data2 have to be in shape (depth x number of CDPs)"""
+
+    r2 = r2_score(data1, data2)
+
+    return r2

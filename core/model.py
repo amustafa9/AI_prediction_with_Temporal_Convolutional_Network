@@ -145,7 +145,7 @@ class TCN(nn.Module):
                                   nn.GroupNorm(num_channels=10, num_groups=1),
                                   nn.Conv2d(in_channels=10,
                                             out_channels=1,
-                                            kernel_size=(1, 3),
+                                            kernel_size=(1, 7),
                                             padding=(0, 0)))
 
         self.synthesis = nn.Sequential(weight_norm(nn.Conv2d(in_channels=num_channels[-1],
@@ -163,7 +163,7 @@ class TCN(nn.Module):
                                        nn.GroupNorm(num_channels=10,
                                                     num_groups=1),
                                        weight_norm(nn.Conv2d(in_channels=10,
-                                                             out_channels=30,
+                                                             out_channels=1,
                                                              kernel_size=(5, 3),
                                                              padding=(2, 1))))
 
@@ -183,6 +183,6 @@ class Model(nn.Module):
         self.regression = nn.Conv1d(in_channels=120, out_channels=1, kernel_size=1)
 
     def forward(self, input):
-        out = self.tcn_local(input[:,:,:,4])
+        out = self.tcn_local(input[:,:,:,2])
         out = self.regression(out)
         return out

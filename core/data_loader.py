@@ -19,7 +19,7 @@ class SeismicLoader(Dataset):
 
 
 # Set up the 2-D seismic dataloader
-class SeismicLoader2D(Dataset):
+class SeamLoader2D(Dataset):
 
     def __init__(self, x_indices, model, mode, data='offset'):
         """x_indices specify the indices of the training and validation well-logs in the model
@@ -78,7 +78,66 @@ class SeismicLoader2D(Dataset):
     def __getitem__(self, index):
         model_index = self.indices[index]
         seismic_index = np.int(model_index/3 * 2 + 1)
-        x = self.section[seismic_index-2:seismic_index+3]  # each seismic input is 3 traces thick and full depth in length
+        x = self.section[seismic_index-3:seismic_index+4]  # each seismic input is 5 traces thick and full depth in length
+        x = x.transpose(0,1).transpose(1,2)  # arrange it in H x W format
+        y = self.model[model_index].to(self.device)
+        return x, y
+
+    def __len__(self):
+        return len(self.indices)  # All the wells are usable except the 1st and the last, since they have no seismic traces to their left and right
+
+
+# Set up the 2-D seismic dataloader
+class MarmousiLoader2D(Dataset):
+
+    def __init__(self, x_indices, mode='train', data='migrated'):
+        """x_indices specify the indices of the training and validation well-logs in the model
+           model is 2-D model of shape xline x depth
+        """
+
+        # Normalize and standardize the training data
+        if data=='migrated':
+            self.seismic = segyio.cube(pjoin('data', 'Kirchhoff_PoSDM.segy'))
+        else:
+            self.seismic = segyio.cube(pjoin('data', 'SYNTHETIC.segy'))
+        self.x_indices = x_indices
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = segyio.cube(pjoin('data', 'MODEL_P-WAVE_VELOCITY_1.25m.segy')) * segyio.cube(pjoin('data', 'MODEL_DENSITY_1.25m.segy'))
+        self.mode = mode
+        self.data = data
+        self.section, self.model, self.indices = self.standardize(mode)
+
+    def standardize(self, mode):
+        seismic = self.seismic.transpose(1,0,2)[:,:,100:]
+        seismic_normalized = (seismic - seismic.mean(axis=(0,2), keepdims=True)) / seismic.std(axis=(0,2), keepdims=True)  # Normalizing channel to have 0 mean and 1 std
+        section = torch.tensor(seismic_normalized, dtype=torch.float).to(self.device)
+        model = self.model.transpose(1,0,2)[::5,:,::4][:,:,100:]
+
+        train_indices = self.x_indices['training_indices']
+        model = torch.tensor((model - model[train_indices].mean(axis=(0,2), keepdims=True)) /
+                             model[train_indices].std(axis=(0,2), keepdims=True), dtype=torch.float).to(self.device)
+        if mode == 'train':
+            indices = self.x_indices['training_indices']
+            try:
+                if 0 in indices or len(self.model) - 1 in indices:
+                    raise InvalidIndex
+            except InvalidIndex:
+                print('Error: One or more of the model trace indices is invalid.')
+                sys.exit(1)
+        else:
+            indices = self.x_indices['validation_indices']
+            try:
+                if 0 in indices or len(self.model) - 1 in indices:
+                    raise InvalidIndex
+            except InvalidIndex:
+                print('Error: One or more of the model trace indices is invalid.')
+                sys.exit(1)
+        return section, model, indices
+
+    def __getitem__(self, index):
+        model_index = self.indices[index]
+        seismic_index = model_index
+        x = self.section[seismic_index-3:seismic_index+4]  # each seismic input is 3 traces thick and full depth in length
         x = x.transpose(0,1).transpose(1,2)  # arrange it in H x W format
         y = self.model[model_index].to(self.device)
         return x, y
