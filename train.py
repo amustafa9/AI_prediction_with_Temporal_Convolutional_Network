@@ -69,7 +69,7 @@ def train(args):
     # import tcn
     #model = Model().to(device)
     model = TCN(1,1,[10, 30, 60, 90, 120], 9, 0.4).to(device)
-    #model.load_state_dict(torch.load('marmousi_trained_262epochs_59wells.pth'))
+    #model.load_state_dict(torch.load('models/best_val_model.pth'))
 
     for param in model.synthesis.parameters():
         param.requires_grad = True
