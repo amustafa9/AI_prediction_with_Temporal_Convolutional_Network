@@ -30,20 +30,23 @@ def train(args):
                   'validation_indices': np.arange(3,1502,90)
     }
 
+    # Get project root directory
+    root = os.getcwd()
+
     # Set up the dataloader for training dataset
-    train_dataset_seam = SeamLoader2D(x_indices, model=seam_model(), mode='train', data='poststack')
+    train_dataset_seam = SeamLoader2D(x_indices, root, mode='train', data='poststack')
     train_loader_seam = DataLoader(dataset=train_dataset_seam,
                               batch_size=len(train_dataset_seam),
                               shuffle=False)
 
-    val_dataset_seam = SeamLoader2D(x_indices, model=seam_model(), mode='val', data='poststack')
+    val_dataset_seam = SeamLoader2D(x_indices, root,  mode='val', data='poststack')
     val_loader_seam = DataLoader(val_dataset_seam, batch_size=len(val_dataset_seam))
 
     x_indices = {'training_indices': np.arange(3, 1502, 300),
                  'validation_indices': np.arange(3, 1496, 3)
                  }
 
-    test_dataset_seam = SeamLoader2D(x_indices, model=seam_model(), mode='test', data='poststack')
+    test_dataset_seam = SeamLoader2D(x_indices, root, mode='test', data='poststack')
     test_loader_seam = DataLoader(test_dataset_seam, batch_size=40)
 
     x_indices = {'training_indices': np.arange(451, 2199, 30),
@@ -71,8 +74,8 @@ def train(args):
     model = TCN(1,1,[10, 30, 60, 90, 120], 9, 0.4).to(device)
     #model.load_state_dict(torch.load('models/best_val_model.pth'))
 
-    for param in model.synthesis.parameters():
-        param.requires_grad = True
+    # for param in model.synthesis.parameters():
+    #     param.requires_grad = True
 
     # Set up loss
     criterion = torch.nn.MSELoss()
@@ -113,11 +116,11 @@ def train(args):
             with torch.no_grad():
                 model.eval()
                 for x_val,y_val in val_loader_marmousi:
-                    y_pred, _ = model(x_val)
+                    y_pred, x_hat = model(x_val)
                     val_loss_marmousi = criterion(y_pred, y_val)
                     writer.add_scalar('Marmousi_val_loss', val_loss_marmousi.item(), iter)
                 for x_val,y_val in val_loader_seam:
-                    y_pred, _ = model(x_val)
+                    y_pred, x_hat = model(x_val)
                     val_loss_seam = criterion(y_pred, y_val)
                     writer.add_scalar('SEAM_val_loss', val_loss_seam.item(), iter)
                     if val_loss_seam.item() <= last_val_loss:

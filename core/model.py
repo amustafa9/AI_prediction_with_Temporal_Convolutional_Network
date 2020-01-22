@@ -179,10 +179,10 @@ class TCN(nn.Module):
 class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
-        self.tcn_local = TemporalConvNet(num_inputs=1, num_channels=[3, 10, 30, 60, 90, 120], kernel_size=5, dropout=0.2)
-        self.regression = nn.Conv1d(in_channels=120, out_channels=1, kernel_size=1)
+        self.tcn_local = TemporalConvNet(num_inputs=1, num_channels=[3, 6, 6, 6, 6, 6], kernel_size=9, dropout=0.2)
+        self.regression = nn.Conv1d(in_channels=6, out_channels=1, kernel_size=1)
 
     def forward(self, input):
-        out = self.tcn_local(input[:,:,:,2])
+        out = self.tcn_local(input[:,:,:,3])
         out = self.regression(out)
         return out
