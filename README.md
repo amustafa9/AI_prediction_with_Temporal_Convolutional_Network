@@ -63,7 +63,7 @@ tensorboard --logdir path/to/log-directory
 ```  
 
 ## Citation 
-If you have found our code and data useful, we humbly request you to cite our work. You can cite the arXiv preprint:
+If you have found our code and data useful, we humbly request you to cite our work. You can cite the the work using the following BibTex citation: 
 ```tex
 @inproceedings{MustafaTCN,
   doi = {10.1190/segam2019-3216840.1},
