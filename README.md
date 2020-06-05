@@ -1,5 +1,6 @@
 # Estimation of Acoustic Impedance from Seismic Data using Temporal Convolutional Network
 Ahmad Mustafa, [Motaz Alfarraj](http://www.motaz.me), and [Ghasssan AlRegib](http://www.ghassanalregib.com) 
+[![DOI](https://zenodo.org/badge/193116631.svg)](https://zenodo.org/badge/latestdoi/193116631)
 
 This repository includes the codes for the paper:
 
@@ -62,12 +63,16 @@ tensorboard --logdir path/to/log-directory
 ## Citation 
 If you have found our code and data useful, we humbly request you to cite our work. You can cite the arXiv preprint:
 ```tex
-@incollection{amustafa2019AI,
-title=Estimation of Acoustic Impedance from Seismic Data using Temporal Convolutional Network,
-author=Mustafa, Ahmad and AlRegib, Ghassan,
-booktitle=arXiv:1906.02684,
-year=2019,
-publisher=Society of Exploration Geophysicists}
+@inproceedings{MustafaTCN,
+  doi = {10.1190/segam2019-3216840.1},
+  url = {https://doi.org/10.1190/segam2019-3216840.1},
+  year = {2019},
+  month = aug,
+  publisher = {Society of Exploration Geophysicists},
+  author = {Ahmad Mustafa and Motaz Alfarraj and Ghassan AlRegib},
+  title = {Estimation of acoustic impedance from seismic data using temporal convolutional network},
+  booktitle = {{SEG} Technical Program Expanded Abstracts 2019}
+}
 ```
 The arXiv preprint is available at: [https://arxiv.org/abs/1906.02684](https://arxiv.org/abs/1906.02684)
 
