@@ -1,5 +1,7 @@
 # Estimation of Acoustic Impedance from Seismic Data using Temporal Convolutional Network
 Ahmad Mustafa, [Motaz Alfarraj](http://www.motaz.me), and [Ghasssan AlRegib](http://www.ghassanalregib.com) 
+
+
 [![DOI](https://zenodo.org/badge/193116631.svg)](https://zenodo.org/badge/latestdoi/193116631)
 
 This repository includes the codes for the paper:
